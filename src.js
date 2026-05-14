@@ -73,7 +73,10 @@ function compileConstructor(dtype, dimension) {
         
     let CTOR_LIST = CACHED_CONSTRUCTORS[dtype], ORDER = order
     
+    let indexAt = (args,bind)=>{return bind.offset+indices.reduce((sum,cur)=>sum+bind.stride[cur]*args[cur],0)}
+    
     let fn = {
+      
       [className]: function(a, ...args) {
         this.data = a
         this.shape = args.slice(0, dimension)
@@ -84,25 +87,21 @@ function compileConstructor(dtype, dimension) {
         return indices.map((e)=>this.shape[e]).reduce((sum,cur)=>sum*cur,1)
       },
       [className+"_set"]:useGetters?function(...args){
-        return this.data.set(this.offset+indices.reduce((sum,cur)=>sum+this.stride[cur]*args[cur],0), args[dimension])
+        return this.data.set(indexAt(args,this), args[dimension])
       }:function(...args){
-        return this.data[this.offset+indices.reduce((sum,cur)=>sum+this.stride[cur]*args[cur],0)] = args[dimension]
+        return this.data[indexAt(args,this)] = args[dimension]
       },
       [className+"_get"]:useGetters?function(...args){
-        return this.data.get(this.offset+indices.reduce((sum,cur)=>sum+this.stride[cur]*args[cur],0))
+        return this.data.get(indexAt(args,this))
       }:function(...args){
-        return this.data[this.offset+indices.reduce((sum,cur)=>sum+this.stride[cur]*args[cur],0)]
+        return this.data[indexAt(args,this)]
       },
       [className+"_index"]:function(...args){
-        return this.offset+indices.reduce((sum,cur)=>sum+this.stride[cur]*args[cur],0)
+        return indexAt(args,this)
       },
       [className+"_hi"]:function(...args){
-        return new fn[className](
-          this.data,
-          ...indices.map((e)=>(typeof args[e]!=='number'||args[e]<0)?this.shape[e]:args[e]|0),
-          ...this.stride,
-          this.offset
-        )
+        let newShape = indices.map((e)=>(typeof args[e]!=='number'||args[e]<0)?this.shape[e]:args[e]|0)
+        return new fn[className](this.data, ...newShape, ...this.stride, this.offset)
       },
       [className+"_lo"]:function(...args){
         let b=this.offset,c=[...this.shape],d=0
@@ -115,12 +114,7 @@ function compileConstructor(dtype, dimension) {
           }
         })
     
-        return new fn[className](
-            this.data,
-            ...c,
-            ...this.stride,
-            b
-        )
+        return new fn[className](this.data, ...c, ...this.stride, b)
       },
       [className+"_step"]:function(...args){
         let a=[...this.shape],b=[...this.stride],c=this.offset,d=0
@@ -138,12 +132,7 @@ function compileConstructor(dtype, dimension) {
           }
         })
           
-        return new fn[className](
-          this.data,
-          ...a,
-          ...b,
-          c
-        )
+        return new fn[className](this.data, ...a, ...b, c)
       },
       [className+"_transpose"]:function(...args){
         args = args.map(function(n,idx) {return n=(n===undefined?idx:n|0)})
@@ -151,12 +140,7 @@ function compileConstructor(dtype, dimension) {
         let tShape = [...indices].map((e)=>this.shape[args[e]])
         let tStride = [...indices].map((e)=>this.stride[args[e]])
         
-        return new fn[className](
-          this.data,
-          ...tShape,
-          ...tStride,
-          this.offset
-        )
+        return new fn[className](this.data, ...tShape, ...tStride, this.offset)
       },
       [className+"_pick"]:function(...args){
         let a=[],b=[],c=this.offset
@@ -166,14 +150,9 @@ function compileConstructor(dtype, dimension) {
         })
         
         return CTOR_LIST[a.length+1](this.data,a,b,c)
-        
       },
       ["construct_"+className]:function(data,shape,stride,offset){
-        return new fn[className](data,
-          ...shape,
-          ...stride,
-          offset
-        )
+        return new fn[className](data, ...shape, ...stride, offset)
       }
     }
     
@@ -200,31 +179,13 @@ function arrayDType(data) {
   if(data?.constructor?.isBuffer?.(data)) {
     return "buffer"
   }
-  if((typeof Float64Array) !== "undefined") {
-    switch(Object.prototype.toString.call(data)) {
-      case "[object Float64Array]":
-        return "float64"
-      case "[object Float32Array]":
-        return "float32"
-      case "[object Int8Array]":
-        return "int8"
-      case "[object Int16Array]":
-        return "int16"
-      case "[object Int32Array]":
-        return "int32"
-      case "[object Uint8Array]":
-        return "uint8"
-      case "[object Uint16Array]":
-        return "uint16"
-      case "[object Uint32Array]":
-        return "uint32"
-      case "[object Uint8ClampedArray]":
-        return "uint8_clamped"
-      case "[object BigInt64Array]":
-        return "bigint64"
-      case "[object BigUint64Array]":
-        return "biguint64"
-    }
+  if(typeof Float64Array !== "undefined") {
+    const type = Object.prototype.toString.call(data)
+      .slice(8, -1)
+      .replace("Clamped", "_clamped")
+      .replace("Array", "")
+      .toLowerCase()
+    if(type in CACHED_CONSTRUCTORS) return type
   }
   if(Array.isArray(data)) {
     return "array"
