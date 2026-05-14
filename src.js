@@ -35,7 +35,7 @@ function compileConstructor(dtype, dimension) {
     proto.size=0;
     proto.dimension=-1;
     proto.shape=proto.stride=proto.order=[];
-    proto.lo=proto.hi=proto.transpose=proto.step=function(){return new fn[className](this.data);};
+    proto.lo=proto.hi=proto.transpose=proto.step=function(){return new fn[className](this.data)};
     proto.get=proto.set=function(){};
     proto.pick=function(){return null};
     return fn["construct_"+className]
@@ -84,7 +84,7 @@ function compileConstructor(dtype, dimension) {
         this.offset = args[dimension*2] | 0
       },
       [className+"_size"]:function(){
-        return indices.map((e)=>this.shape[e]).reduce((sum,cur)=>sum*cur,1)
+        return this.shape.reduce((sum,cur)=>sum*cur,1)
       },
       [className+"_set"]:useGetters?function(...args){
         return this.data.set(indexAt(args,this), args[dimension])
