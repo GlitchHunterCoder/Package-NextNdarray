@@ -7,6 +7,7 @@ below the readme is split between 2 parts,
 - ## ndarray
 
 > ### which is the underlying code, ndarrays isnt my idea, that credit goes to [`Mikola Lysenko`](https://github.com/mikolalysenko/ndarray), im just responsible for the code refactor
+> All [LICENSES](https://github.com/GlitchHunterCoder/Package-NextNdarray/blob/main/LICENSE) notices have been adhered to, all copyright notices have been preserved
 
 <details>
 
