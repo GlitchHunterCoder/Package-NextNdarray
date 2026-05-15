@@ -6,7 +6,7 @@ below the readme is split between 2 parts,
 
 - ## ndarray
 
-> ### which is the underlying code, ndarrays isnt my idea, that credit goes to `Mikola Lysenko`, im just responsible for the code refactor
+> ### which is the underlying code, ndarrays isnt my idea, that credit goes to [`Mikola Lysenko`](https://github.com/mikolalysenko/ndarray), im just responsible for the code refactor
 
 <details>
 
