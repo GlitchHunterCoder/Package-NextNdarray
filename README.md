@@ -13,7 +13,7 @@ below the readme is split between 2 parts,
 
 <summary>
   
-NextNdarray
+[ NextNdarray ]
 =======
 
 </summary>
@@ -73,7 +73,7 @@ it just took until 2026 for someone to actually rewrite it
 <details>
 <summary>
   
-ndarray
+[ ndarray ]
 =======
 
 </summary>
