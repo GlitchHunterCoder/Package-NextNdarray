@@ -34,7 +34,7 @@ function compileConstructor(dtype, dimension) {
         this.data = data
         this.shape = dimIs==2?shape:[] //should be [] for dimIs !== 2
         this.stride = dimIs==2?stride:[]  //should be [] for dimIs !== 2
-        this.offset = offset //dimIs=1 -> arg[1] built in
+        this.offset = [void 0,shape,offset][dimIs] //dimIs=1 -> arg[1] built in
       },
       [className+"_size"]:[()=>0,()=>1,function(){
         return this.shape.reduce((sum,cur)=>sum*cur,1)
