@@ -21,87 +21,46 @@ function compileConstructor(dtype, dimension) {
     className = "View_Nil" + dtype
   }
   let useGetters = (dtype === "generic")
-
-  if(dimension === -1) {
-    //Special case for trivial arrays
   
-    let fn = {
-      [className]:function(a){this.data=a},
-      ["construct_"+className]:function(a){return new fn[className](a)}
-    }
-    let proto=fn[className].prototype;
-    proto.dtype=dtype;
-    proto.index=function(){return -1};
-    proto.size=0;
-    proto.dimension=-1;
-    proto.shape=proto.stride=proto.order=[];
-    proto.lo=proto.hi=proto.transpose=proto.step=function(){return new fn[className](this.data)};
-    proto.get=proto.set=function(){};
-    proto.pick=function(){return null};
-    return fn["construct_"+className]
-
-  } else if(dimension === 0) {
-    //Special case for 0d arrays
-
-    let TrivialArray = CACHED_CONSTRUCTORS[dtype][0]
-    let fn = {
-      [className]:function(a,d){this.data=a;this.offset=d},
-      [className+"_copy"]:function(){return new fn[className](this.data,this.offset)},
-      [className+"_pick"]:function(){return TrivialArray(this.data)},
-      [className+"_get"]:useGetters ? function(){return this.data.get(this.offset)} : function(){return this.data[this.offset]},
-      [className+"_set"]:useGetters ? function(v){return this.data.set(this.offset,v)} : function(v){return this.data[this.offset]=v},
-      ["construct_"+className]:function(a,b,c,d){return new fn[className](a,d)}
-    }
-    
-    let proto=fn[className].prototype;
-    proto.dtype=dtype;
-    proto.index=function(){return this.offset};
-    proto.dimension=0;
-    proto.size=1;
-    proto.shape=proto.stride=proto.order=[];
-    proto.lo=proto.hi=proto.transpose=proto.step=fn[className+"_copy"]
-    proto.pick=fn[className+"_pick"]
-    proto.valueOf=proto.get=fn[className+"_get"]
-    proto.set=fn[className+"_set"]
-    return fn["construct_"+className]
-  }
-
+  let dimIs = Math.min(dimension+1,2)
   //easy cached iterated over array
-  let indices = Array(dimension).fill(1).map((_,i)=>i)
+  let indices = Array(Math.max(dimension,0)).fill(1).map((_,i)=>i)
     
-  procedure = function(){
-        
-    let CTOR_LIST = CACHED_CONSTRUCTORS[dtype], ORDER = order
-    
+  procedure = function(){ 
+    let CTOR_LIST = CACHED_CONSTRUCTORS[dtype], TrivialArray = CTOR_LIST[0]
     let indexAt = (args,bind)=>{return bind.offset+indices.reduce((sum,cur)=>sum+bind.stride[cur]*args[cur],0)}
-    
     let fn = {
-      
-      [className]: function(a, ...args) {
-        this.data = a
-        this.shape = args.slice(0, dimension)
-        this.stride = args.slice(dimension, dimension*2)
-        this.offset = args[dimension*2] | 0
+      [className]: function(data,shape,stride,offset) {
+        this.data = data
+        this.shape = dimIs==2?shape:[] //should be [] for dimIs !== 2
+        this.stride = dimIs==2?stride:[]  //should be [] for dimIs !== 2
+        this.offset = offset //dimIs=1 -> arg[1] built in
       },
-      [className+"_size"]:function(){
+      [className+"_size"]:[()=>0,()=>1,function(){
         return this.shape.reduce((sum,cur)=>sum*cur,1)
-      },
-      [className+"_set"]:useGetters?function(...args){
-        return this.data.set(indexAt(args,this), args[dimension])
-      }:function(...args){
-        return this.data[indexAt(args,this)] = args[dimension]
-      },
-      [className+"_get"]:useGetters?function(...args){
-        return this.data.get(indexAt(args,this))
-      }:function(...args){
-        return this.data[indexAt(args,this)]
-      },
-      [className+"_index"]:function(...args){
-        return indexAt(args,this)
-      },
+      }][dimIs],
+      [className+"_set"]:(
+        useGetters?
+          [()=>{},function(v){return this.data.set(this.offset,v)},function(...args){
+            return this.data.set(indexAt(args,this), args[dimension])
+          }][dimIs]:
+          [()=>{},function(v){return this.data[this.offset]=v},function(...args){
+            return this.data[indexAt(args,this)] = args[dimension]
+          }][dimIs]
+      ),
+      [className+"_get"]:(
+        useGetters?
+          [()=>{},function(){return this.data.get(this.offset)},function(...args){
+            return this.data.get(indexAt(args,this))
+          }][dimIs]:
+          [()=>{},function(){return this.data[this.offset]},function(...args){
+            return this.data[indexAt(args,this)]
+          }][dimIs]
+      ),
+      [className+"_index"]:[()=>-1,function(){return this.offset},function(...args){return indexAt(args,this)}][dimIs],
       [className+"_hi"]:function(...args){
         let newShape = indices.map((e)=>(typeof args[e]!=='number'||args[e]<0)?this.shape[e]:args[e]|0)
-        return new fn[className](this.data, ...newShape, ...this.stride, this.offset)
+        return new fn[className](this.data, newShape, this.stride, this.offset)
       },
       [className+"_lo"]:function(...args){
         let b=this.offset,c=[...this.shape],d=0
@@ -114,7 +73,7 @@ function compileConstructor(dtype, dimension) {
           }
         })
     
-        return new fn[className](this.data, ...c, ...this.stride, b)
+        return new fn[className](this.data, c, this.stride, b)
       },
       [className+"_step"]:function(...args){
         let a=[...this.shape],b=[...this.stride],c=this.offset,d=0
@@ -132,7 +91,7 @@ function compileConstructor(dtype, dimension) {
           }
         })
           
-        return new fn[className](this.data, ...a, ...b, c)
+        return new fn[className](this.data, a, b, c)
       },
       [className+"_transpose"]:function(...args){
         args = args.map(function(n,idx) {return n=(n===undefined?idx:n|0)})
@@ -140,9 +99,9 @@ function compileConstructor(dtype, dimension) {
         let tShape = [...indices].map((e)=>this.shape[args[e]])
         let tStride = [...indices].map((e)=>this.stride[args[e]])
         
-        return new fn[className](this.data, ...tShape, ...tStride, this.offset)
+        return new fn[className](this.data, tShape, tStride, this.offset)
       },
-      [className+"_pick"]:function(...args){
+      [className+"_pick"]:[()=>null,function(){return TrivialArray(this.data)},function(...args){
         let a=[],b=[],c=this.offset
       
         indices.map((e)=>{
@@ -150,17 +109,18 @@ function compileConstructor(dtype, dimension) {
         })
         
         return CTOR_LIST[a.length+1](this.data,a,b,c)
-      },
+      }][dimIs],
       ["construct_"+className]:function(data,shape,stride,offset){
-        return new fn[className](data, ...shape, ...stride, offset)
+        return new fn[className](data, shape, stride, offset)
       }
     }
     
     let proto=fn[className].prototype;
+    proto.valueOf=!dimension?fn[className+"_get"]:proto.valueOf
     proto.dtype=dtype;
     proto.dimension=dimension;
     Object.defineProperty(proto,'size',{get:fn[className+"_size"]})
-    Object.defineProperty(proto,'order',{get:ORDER})
+    Object.defineProperty(proto,'order',dimIs===2?{get:order}:[])
     proto.set=fn[className+"_set"]
     proto.get=fn[className+"_get"]
     proto.index=fn[className+"_index"]
@@ -169,6 +129,15 @@ function compileConstructor(dtype, dimension) {
     proto.step=fn[className+"_step"]
     proto.transpose=fn[className+"_transpose"]
     proto.pick=fn[className+"_pick"]
+    
+    if(dimIs!==2){
+      proto.lo=proto.hi=proto.transpose=proto.step=[
+        function(){return new fn[className](this.data)},
+        function(){return new fn[className](this.data,this.offset)},
+        void 0
+      ][dimIs]
+    }
+    
     return fn["construct_"+className]
   }
 
