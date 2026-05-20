@@ -4,12 +4,12 @@ function order() {
   let stride = this.stride
   let terms = new Array(stride.length)
   let i
-  for(i=0; i<terms.length; ++i) {
+  for(i=0; i<terms.length; i++) {
     terms[i] = [Math.abs(stride[i]), i]
   }
   terms.sort((a,b)=>a[0]-b[0])
   let result = new Array(terms.length)
-  for(i=0; i<result.length; ++i) {
+  for(i=0; i<result.length; i++) {
     result[i] = terms[i][1]
   }
   return result
@@ -17,13 +17,11 @@ function order() {
 
 function compileConstructor(dtype, dimension) {
   let className = ["View", dimension, "d", dtype].join("")
-  if(dimension < 0) {
-    className = "View_Nil" + dtype
-  }
+  if(dimension < 0) {className = "View_Nil" + dtype}
   let useGetters = (dtype === "generic")
   
   let dimIs = Math.min(dimension+1,2)
-  //easy cached iterated over array
+
   let indices = Array(Math.max(dimension,0)).fill(1).map((_,i)=>i)
     
   procedure = function(){ 
@@ -32,9 +30,9 @@ function compileConstructor(dtype, dimension) {
     let fn = {
       [className]: function(data,shape,stride,offset) {
         this.data = data
-        this.shape = dimIs==2?shape:this.shape //should be [] for dimIs !== 2
-        this.stride = dimIs==2?stride:this.stride  //should be [] for dimIs !== 2
-        this.offset = [void 0,shape,offset][dimIs] //dimIs=1 -> arg[1] built in
+        this.shape = dimIs==2?shape:this.shape
+        this.stride = dimIs==2?stride:this.stride
+        this.offset = [void 0,shape,offset][dimIs]
       },
       [className+"_size"]:[()=>0,()=>1,function(){
         return this.shape.reduce((sum,cur)=>sum*cur,1)
@@ -94,7 +92,7 @@ function compileConstructor(dtype, dimension) {
         return new fn[className](this.data, a, b, c)
       },
       [className+"_transpose"]:function(...args){
-        args = args.map(function(n,idx) {return n=(n===undefined?idx:n|0)})
+        args = args.map(function(n,idx) {return n=((n===void 0)?idx:n|0)})
         
         let tShape = [...indices].map((e)=>this.shape[args[e]])
         let tStride = [...indices].map((e)=>this.stride[args[e]])
@@ -129,7 +127,7 @@ function compileConstructor(dtype, dimension) {
     proto.dtype=dtype;
     proto.dimension=dimension;
     Object.defineProperty(proto,'size',{get:fn[className+"_size"]})
-    Object.defineProperty(proto,'order',dimIs===2?{get:order}:[])
+    Object.defineProperty(proto,'order',{get:order,configurable:true})
     proto.set=fn[className+"_set"]
     proto.get=fn[className+"_get"]
     proto.index=fn[className+"_index"]
@@ -154,11 +152,11 @@ function arrayDType(data) {
   if(data?.constructor?.isBuffer?.(data)) {
     return "buffer"
   }
-  if(typeof Float64Array !== "undefined") {
+  if(typeof Float64Array !== ""+void 0) {
     const type = Object.prototype.toString.call(data)
       .slice(8, -1)
       .replace("Clamped", "_clamped")
-      .replace("Array", "")
+      .replace(/(?<=\w)Array/g, "")
       .toLowerCase()
     if(type in CACHED_CONSTRUCTORS) return type
   }
@@ -194,26 +192,26 @@ let CACHED_CONSTRUCTORS = {
 */
 
 function wrappedNDArrayCtor(data, shape, stride, offset) {
-  if(data === undefined) {
+  if(data === void 0) {
     let ctor = CACHED_CONSTRUCTORS.array[0]
     return ctor([])
   } else if(typeof data === "number") {
     data = [data]
   }
-  if(shape === undefined) {
+  if(shape === void 0) {
     shape = [ data.length ]
   }
   let d = shape.length
-  if(stride === undefined) {
+  if(stride === void 0) {
     stride = new Array(d)
-    for(let i=d-1, sz=1; i>=0; --i) {
+    for(let i=d-1, sz=1; i>=0; i--) {
       stride[i] = sz
       sz *= shape[i]
     }
   }
-  if(offset === undefined) {
+  if(offset === void 0) {
     offset = 0
-    for(let i=0; i<d; ++i) {
+    for(let i=0; i<d; i++) {
       if(stride[i] < 0) {
         offset -= (shape[i]-1)*stride[i]
       }
