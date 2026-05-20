@@ -32,8 +32,8 @@ function compileConstructor(dtype, dimension) {
     let fn = {
       [className]: function(data,shape,stride,offset) {
         this.data = data
-        this.shape = dimIs==2?shape:[] //should be [] for dimIs !== 2
-        this.stride = dimIs==2?stride:[]  //should be [] for dimIs !== 2
+        this.shape = dimIs==2?shape:this.shape //should be [] for dimIs !== 2
+        this.stride = dimIs==2?stride:this.stride  //should be [] for dimIs !== 2
         this.offset = [void 0,shape,offset][dimIs] //dimIs=1 -> arg[1] built in
       },
       [className+"_size"]:[()=>0,()=>1,function(){
@@ -105,11 +105,20 @@ function compileConstructor(dtype, dimension) {
         let a=[],b=[],c=this.offset
       
         indices.map((e)=>{
-          if(typeof args[e]==='number'&&args[e]>=0){c=(c+this.stride[e]*args[e])|0}else{a.push(this.shape[e]);b.push(this.stride[e])}
+          if(typeof args[e]==='number'&&args[e]>=0){
+            c=(c+this.stride[e]*args[e])|0
+          }else{
+            a.push(this.shape[e]);b.push(this.stride[e])
+          }
         })
         
         return CTOR_LIST[a.length+1](this.data,a,b,c)
       }][dimIs],
+      [className+"_copy"]:[
+        function(){return new fn[className](this.data)},
+        function(){return new fn[className](this.data,this.offset)},
+        void 0
+      ][dimIs],
       ["construct_"+className]:function(data,shape,stride,offset){
         return new fn[className](data, shape, stride, offset)
       }
@@ -131,11 +140,8 @@ function compileConstructor(dtype, dimension) {
     proto.pick=fn[className+"_pick"]
     
     if(dimIs!==2){
-      proto.lo=proto.hi=proto.transpose=proto.step=[
-        function(){return new fn[className](this.data)},
-        function(){return new fn[className](this.data,this.offset)},
-        void 0
-      ][dimIs]
+      proto.shape=proto.stride=proto.order=[];
+      proto.lo=proto.hi=proto.transpose=proto.step=fn[className+"_copy"]
     }
     
     return fn["construct_"+className]
