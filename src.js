@@ -28,7 +28,7 @@ function compileConstructor(dtype, dimension) {
     let CTOR_LIST = CACHED_CONSTRUCTORS[dtype], TrivialArray = CTOR_LIST[0]
     let indexAt = (args,bind)=>{return bind.offset+indices.reduce((sum,cur)=>sum+bind.stride[cur]*args[cur],0)}
     let fn = {
-      [className]: function(data,shape,stride,offset) {
+      [className](data,shape,stride,offset){
         this.data = data
         this.shape = dimIs==2?shape:this.shape
         this.stride = dimIs==2?stride:this.stride
@@ -56,11 +56,11 @@ function compileConstructor(dtype, dimension) {
           }][dimIs]
       ),
       [className+"_index"]:[()=>-1,function(){return this.offset},function(...args){return indexAt(args,this)}][dimIs],
-      [className+"_hi"]:function(...args){
+      [className+"_hi"](...args){
         let newShape = indices.map((e)=>(typeof args[e]!=='number'||args[e]<0)?this.shape[e]:args[e]|0)
         return new fn[className](this.data, newShape, this.stride, this.offset)
       },
-      [className+"_lo"]:function(...args){
+      [className+"_lo"](...args){
         let b=this.offset,c=[...this.shape],d=0
 
         indices.map((e)=>{
@@ -73,7 +73,7 @@ function compileConstructor(dtype, dimension) {
     
         return new fn[className](this.data, c, this.stride, b)
       },
-      [className+"_step"]:function(...args){
+      [className+"_step"](...args){
         let a=[...this.shape],b=[...this.stride],c=this.offset,d=0
     
         indices.map((e)=>{
@@ -91,7 +91,7 @@ function compileConstructor(dtype, dimension) {
           
         return new fn[className](this.data, a, b, c)
       },
-      [className+"_transpose"]:function(...args){
+      [className+"_transpose"](...args){
         args = args.map(function(n,idx) {return n=((n===void 0)?idx:n|0)})
         
         let tShape = [...indices].map((e)=>this.shape[args[e]])
@@ -117,7 +117,7 @@ function compileConstructor(dtype, dimension) {
         function(){return new fn[className](this.data,this.offset)},
         void 0
       ][dimIs],
-      ["construct_"+className]:function(data,shape,stride,offset){
+      ["construct_"+className](data,shape,stride,offset){
         return new fn[className](data, shape, stride, offset)
       }
     }
@@ -227,3 +227,13 @@ function wrappedNDArrayCtor(data, shape, stride, offset) {
 }
 
 let ndarray = wrappedNDArrayCtor
+
+
+var mat = ndarray(new Float64Array([1, 0, 0, 1]), [2,2])
+
+console.log(mat)
+//Now:
+//
+// mat = 1 0
+//       0 1
+//
